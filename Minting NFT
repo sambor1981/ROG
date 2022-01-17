@@ -1,0 +1,194 @@
+
+#First we must turn your desired NFT name into a string of characters called a Base16 code.  Make sure you use a different name for each NFT. This name should not have spaces.  Paste the Base16 string into the next command for "tokenname". 
+Note - This name won't be the display name of your NFT.  The dispay name of your NFT is set separately in the metadata.json file. 
+
+______________________________________
+
+cd $NODE_HOME
+echo -n "EnterDesiredAssetNameHere" | xxd -ps
+
+______________________________________
+
+tokenname="InsertYourBase16codeHere"
+tokenamount="1"
+fee="0"
+output="0"
+receiver="PasteCardanoAddressYouWantTheNFTsentToaddr00000000000000000000000000000000000000000000"
+ipfs_hash="InsertPinataCIDhere"
+
+______________________________________
+#The below commands create a new Policy ID, payment address, policy.skey, policy.vkey, payment.skey and payment.vkey.  Note - You will not want to do this if you are minting additional NFT's for an existing collection.  You should reuse the same Policy for a whole collection.  Not create a new policy.  A policy can be reused until its expired slot number is reached.  
+
+#So if you are reusing your policy, just send 2 ADA to the existing payment.addr file in cardano-my-node folder which you have used previously, and skip ahead to the Metadata command further down entitled "#Now we create the metadata file for your NFT."
+#When you are minting many similar NFT's, just change the 2x name fields in metadata.json, the IPFS hash both metadata.json and minting commands.  The new base16 encoded name in minting commands and the utxo hash in minting commands.  Then you can jump straight to command "cardano-cli query utxo --address $(cat payment.addr) --mainnet"
+
+
+#Once you have created a policy and used it to mint, but you want to reuse the policy to mint more at a future date.  Backup the "policy" folder in cardano-my-node folder, and the policy.skey, policy.vkey, payment.skey, payment.vkey and metadata.json files in cardano-my-node folder.  
+#When you want to load the policy again for minting, just past these files back into the same location - paste the "policy" folder containing the policy.scipt and policyID files into cardano-my-node folder.  Paste the metadata.json, payment.addr, payment.skey, payment.vkey, policy.skey and policy.vkey files into cardano-my-node folder.
+______________________________________
+
+cardano-cli address key-gen --verification-key-file payment.vkey --signing-key-file payment.skey
+
+______________________________________
+
+cardano-cli address build --payment-verification-key-file payment.vkey --out-file payment.addr --mainnet
+
+______________________________________
+
+#Send 2ADA to the above address - payment.addr
+
+______________________________________
+
+cardano-cli query protocol-parameters --mainnet --out-file protocol.json
+
+______________________________________
+
+mkdir policy
+
+______________________________________
+
+cardano-cli address key-gen --verification-key-file policy.vkey --signing-key-file policy.skey
+
+______________________________________
+
+touch policy/policy.script && echo "" > policy/policy.script
+
+______________________________________
+
+#Paste below brackets and text into policy.script file (located in your cardano-my-node policy directory) and save.
+
+{
+    "scripts": [
+        {
+            "keyHash": "00000000000000000000000000000000000",
+            "type": "sig"
+        },
+        {
+            "slot": 00000000,
+            "type": "before"
+        }
+    ],
+    "type": "all"
+}
+
+______________________________________
+#Run below command and paste output into your policy.script "keyHash" field and save.  
+#(Your policy.script is located in your cardano-my-node > policy folder.)
+
+cardano-cli address key-hash --payment-verification-key-file policy.vkey
+
+______________________________________
+#Run below command and paste output into above script "slot" section, plus add 2000 slots (33 minutes) or 86,400 (1 day) or 2,592,000 (30 days) or however long you want and save.  1 slot is 1 second.  After the slot number is passed, the policy can no longer be used to mint anything.
+
+cardano-cli query tip --mainnet
+
+______________________________________
+
+#Now we create the metadata file for your NFT.
+#Copy the below metadata text into a text editor, edit and change the "Collection" through to "image" fields to your liking, and save the file with name "metadata.json" in cardano-my-node folder.  The limit of characters (including spaces) per line is 64.
+#(Note - If you have an existing metadata.json file from the same NFT collection, you can just edit the 2 name fields and the IPFS Hash, and any other relevant bits and save.)
+#You can add or deduct headings and fields as necessary.    Just copy and paste a new row with brackets, and edit the text.  You can add or change a heading to "description" or whatever you feel like.
+#The "InsertTheUnbrokenNameOfYourNFThere-NotTheBase16code" field should be the name you Base16 encoded in step one, but paste the unencoded name here, not the Base16 code version of the name.
+
+{
+  "721": {
+    "InsertPolicyIDhere": {
+      "InsertTheOrdinaryNameOfYourNFThere-NoSpaces-NotTheBase16code": {
+        "Collection": ["Futuristic."],
+        "Artist": ["Volodymyr B."],
+        "Rarity": ["Rare"],
+        "ID": ["1 of 3"],
+        "Discord": ["https://discord.gg/8mptBvW52J"],
+        "Twitter": ["https://twitter.com/RStakepool"],        
+        "publisher": ["StakePool: [ROG]", "https://www.rogpool.com"],
+        "name": "e.g. Futuristic McLaren Formula 1 #001",
+        "image": "ipfs://InsertPinataCIDhere"
+      }
+    }
+  }
+}
+
+______________________________________
+
+cardano-cli transaction policyid --script-file ./policy/policy.script >> policy/policyID
+
+______________________________________
+
+#After running above command, go to your cardano-my-node > policy folder and open policyID.  Copy the policyID string and paste it into your metadata.json field "InsertPolicyIDhere" and save metadata.json.
+
+______________________________________
+
+#update the below path with your Ubuntu username. 
+
+scriptpath="/home/INSERTyourUBUNTUusernameHERE/cardano-my-node/policy/policy.script" 
+______________________________________
+
+cardano-cli query utxo --address $(cat payment.addr) --mainnet
+______________________________________
+
+#Copy and paste the info from the above command to populate these values of the same name. 
+#You can use right-click menu to copy from terminal.
+
+txhash="InsertTxHashFromAboveCommand0000000000"
+txix="0"
+funds="2000000"
+policyid=$(cardano-cli transaction policyid --script-file ./policy/policy.script)
+
+______________________________________
+
+currentSlot=$(cardano-cli query tip --mainnet | jq -r '.slot')
+echo Current Slot: $currentSlot
+______________________________________
+
+
+cardano-cli transaction build-raw \
+--tx-in $txhash#$txix \
+--tx-out $receiver+$output+"$tokenamount $policyid.$tokenname" \
+--mint="$tokenamount $policyid.$tokenname" \
+--minting-script-file $scriptpath \
+--metadata-json-file metadata.json \
+--invalid-hereafter $(( ${currentSlot} + 1000)) \
+--fee $fee \
+--out-file matx.raw
+______________________________________
+
+minfee=$(cardano-cli transaction calculate-min-fee \
+--tx-body-file matx.raw \
+--tx-in-count 1 \
+--tx-out-count 1 \
+--mainnet \
+--witness-count 1 \
+--byron-witness-count 0 \
+--protocol-params-file protocol.json | awk '{ print $1 }')
+echo $minfee
+______________________________________
+
+output=$((${funds}-${minfee}))
+echo $output
+______________________________________
+
+cardano-cli transaction build-raw \
+--tx-in $txhash#$txix \
+--tx-out $receiver+$output+"$tokenamount $policyid.$tokenname" \
+--mint="$tokenamount $policyid.$tokenname" \
+--minting-script-file $scriptpath \
+--metadata-json-file metadata.json \
+--invalid-hereafter $(( ${currentSlot} + 1000)) \
+--fee $minfee \
+--out-file matx.raw
+______________________________________
+
+cardano-cli transaction sign \
+ --tx-body-file matx.raw \
+ --signing-key-file policy.skey \
+ --signing-key-file payment.skey \
+ --mainnet \
+ --out-file tx.signed
+
+______________________________________
+ 
+cardano-cli transaction submit \
+ --tx-file tx.signed \
+ --mainnet
+
+
